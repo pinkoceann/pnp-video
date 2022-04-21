@@ -163,18 +163,12 @@ def main(**args):
 	model_list, path_list = [], []
 
 	for denoiser in args['denoisers']:
-		if 'dncnn' == denoiser:
-			path_list.append("pretrained_models/dncnn_color_blind.pth")
-			model_list.append(DnCNN(in_nc=3, out_nc=3, nc=64, nb=20, act_mode='R'))
-		elif 'ffdnet' == denoiser:
-			path_list.append("pretrained_models/ffdnet_color.pth")
-			model_list.append(FFDNet(in_nc=3, out_nc=3, nc=96, nb=12))
-		elif 'drunet' == denoiser:
+		if 'drunet' == denoiser:
 			path_list.append("pretrained_models/drunet_color.pth")
 			model_list.append(DRUNet())
 		elif 'fastdvdnet' == denoiser:
 			path_list.append("pretrained_models/fastdvdnet_nodp.pth")
-			model_list.append(FastDVDnet(num_input_frames=5))
+			model_list.append(FastDVDnet(num_input_frames=5))net(num_input_frames=5))
 
 
 	tf = transforms.CenterCrop(args['centercrop']) if args['centercrop'] > 0 else None
