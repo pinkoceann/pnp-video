@@ -279,7 +279,7 @@ def main(**args):
 
 if __name__ == "__main__":
 
-	parser = argparse.ArgumentParser(description="Train the denoiser")
+	parser = argparse.ArgumentParser(description="Run PnP restoration of a video dataset")
 	# Program-specific arguments
 	parser.add_argument('--deterministic', dest='deterministic', action='store_true', help='flag to ensure full reproductibility')
 	parser.add_argument('--no-deterministic', dest='deterministic', action='store_false')
