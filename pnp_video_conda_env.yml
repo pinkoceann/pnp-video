@@ -1,0 +1,25 @@
+name: pnp_video
+channels:
+  - pytorch-lts
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - cudatoolkit=11.1
+  - ipywidgets
+  - jupyterlab
+  - matplotlib
+  - numba
+  - numpy
+  - pip
+  - python=3.8
+  - pytorch
+  - scipy
+  - scikit-image
+  - statsmodels
+  - torchvision
+  - tqdm
+  - pip:
+    - opencv-python
+    - thop
+    - hdf5storage
