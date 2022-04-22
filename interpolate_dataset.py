@@ -7,7 +7,6 @@ from torch.utils.data import DataLoader
 import numpy as np
 import time
 import os
-import pickle
 import json
 from thop.utils import clever_format
 
@@ -18,45 +17,23 @@ from utils import pytorch_psnr, ssim_video_batch, get_n_params
 from video_utils import tensor_to_images
 from graph_utils import save_graph, save_graph2
 
-from video_denoiser import pytorch_dncnn_video_denoiser, pytorch_ffdnet_video_denoiser, pytorch_drunet_video_denoiser, pytorch_fastdvdnet_video_denoiser
+from video_denoiser import pytorch_drunet_video_denoiser, pytorch_fastdvdnet_video_denoiser
 from proxs import prox_inpainting
 from torch_optim import torch_admm
 
 
-def mask_video(video, missing_pixels=0.5, mask_images_equally=False, mask_channels_equally=False, mask_3d=True, noise_level=5/255.):
+def mask_video(video, missing_pixels=0.5, mask_channels_equally=False, noise_level=5/255.):
 	B, N, C, H, W = video.shape
 	# generate the mask
-	if mask_images_equally:
-		if mask_channels_equally:
-			mask = torch.ones((B, N, C, H * W), device=video.device)
-			masked_indexes= torch.randperm(H * W)[:round(H * W * missing_pixels)]
-			mask[:, :, :, masked_indexes] = 0
-		else:
-			mask = torch.ones((B, N, C * H * W), device=video.device)
-			masked_indexes= torch.randperm(C * H * W)[:round(C * H * W * missing_pixels)]  # ie all images have the same different proportion of missing pix. / channel (mean of rates of missing pix. of 3 channels = missing_pixels)
-			mask[:, :, masked_indexes] = 0
-		mask = mask.view((B, N, C, H, W))
-	elif mask_3d:
-		if mask_channels_equally:
-			mask = torch.ones((B, C, N * H * W), device=video.device)
-			masked_indexes= torch.randperm(N * H * W)[:round(N * H * W * missing_pixels)]
-			mask[:, :, masked_indexes] = 0
-			mask=mask.view((B, C, N, H, W)).permute(0, 2, 1, 3, 4)
-		else:
-			mask = torch.ones((B, N * C * H * W), device=video.device)
-			masked_indexes= torch.randperm(N * C * H * W)[:round(N * C * H * W * missing_pixels)]
-			mask[:, masked_indexes] = 0
-			mask = mask.view((B, N, C, H, W))
-	else:  ## all images have the same percentage of missing pixels, but their location varies between image
-		mask = torch.ones((B, N, C, H * W), device=video.device)
-		for n in range(N):
-			if mask_channels_equally:
-				masked_indexes= torch.randperm(H * W)[:round(H * W * missing_pixels)]
-				mask[:, n, :, masked_indexes] = 0
-			else:  ## all channels have the same percentage of missing pixels per image, but their location varies per image
-				for c in range(C):
-					masked_indexes= torch.randperm(H * W)[:round(H * W * missing_pixels)]
-					mask[:, n, c,  masked_indexes] = 0
+	if mask_channels_equally:
+		mask = torch.ones((B, C, N * H * W), device=video.device)
+		masked_indexes = torch.randperm(N * H * W)[:round(N * H * W * missing_pixels)]
+		mask[:, :, masked_indexes] = 0
+		mask = mask.view((B, C, N, H, W)).permute(0, 2, 1, 3, 4)
+	else:
+		mask = torch.ones((B, N * C * H * W), device=video.device)
+		masked_indexes = torch.randperm(N * C * H * W)[:round(N * C * H * W * missing_pixels)]
+		mask[:, masked_indexes] = 0
 		mask = mask.view((B, N, C, H, W))
 	# generate the degraded video
 	degraded_video = mask * video
@@ -66,7 +43,7 @@ def mask_video(video, missing_pixels=0.5, mask_images_equally=False, mask_channe
 	return degraded_video, mask
 
 
-def interpolate_video_dataset(model, dataloader, missing_pixels=.9, noise_level=0./255, mask_images_equally=True, mask_channels_equally=True, mask_3d=False, admm_alpha=2.25, admm_denoiser_level=30./255, admm_iters=200, save_frames=False, save_graphs=False, output_folder=None, device=torch.device("cpu"), verbose=1):
+def interpolate_video_dataset(model, dataloader, missing_pixels=.9, noise_level=0./255, mask_channels_equally=False, admm_alpha=2.25, admm_denoiser_level=30./255, admm_iters=200, save_frames=False, save_graphs=False, output_folder=None, device=torch.device("cpu"), verbose=1):
 
 	epsilon_alpha = admm_denoiser_level**2 / admm_alpha
 	if verbose >= 2:
@@ -84,14 +61,14 @@ def interpolate_video_dataset(model, dataloader, missing_pixels=.9, noise_level=
 				video = batch['video'].to(device)
 				B, N, C, H, W = video.shape
 				# generate the degraded video
-				degraded_video, mask = mask_video(video, missing_pixels, mask_images_equally, mask_channels_equally, mask_3d, noise_level)
+				degraded_video, mask = mask_video(video, missing_pixels, mask_channels_equally, noise_level)
 
 				# define the proximal operator of the data term
 				proxF = lambda x : prox_inpainting(x, degraded_video, mask, noise_level, epsilon_alpha)
 
 				init = degraded_video  # initialize with the degraded video
 				t0 = time.time()
-				restored_video, psnr_x_iters, psnr_z_iters, x_grad_iters, z_grad_iters, x_minus_z_iters, dr_iters = torch_admm(init=init, clean=video, proxF=proxF, proxG=Ds, max_iters=admm_iters, verbose=True if verbose >=3 else False)
+				restored_video, psnr_x_iters, psnr_z_iters, x_grad_iters, z_grad_iters, x_minus_z_iters, dr_iters = torch_admm(init=init, clean=video, proxF=proxF, proxG=Ds, max_iters=admm_iters, verbose=True if verbose >= 3 else False)
 				t_forward = time.time() - t0
 
 				# compute psnr
@@ -150,7 +127,6 @@ def interpolate_video_dataset(model, dataloader, missing_pixels=.9, noise_level=
 	return vid_names, psnrs_noisy, ssims_noisy, psnrs_out, ssims_out, runtimes, psnrs_x_iters, psnrs_z_iters, x_grads_iters, z_grads_iters, x_minus_zs_iters, drs_iters, avg_psnr_noisy, avg_ssim_noisy, avg_psnr_out, avg_ssim_out, avg_runtime
 
 
-
 def main(**args):
 	t_init = time.time()
 
@@ -163,7 +139,7 @@ def main(**args):
 		torch.cuda.manual_seed_all(seed)
 		torch.use_deterministic_algorithms(True)
 
-	gpu=args['gpu']
+	gpu = args['gpu']
 	device = torch.device("cuda:0" if gpu and torch.cuda.is_available() else "cpu")
 	print(f"selected device: {device}")
 
@@ -175,8 +151,7 @@ def main(**args):
 			model_list.append(DRUNet())
 		elif 'fastdvdnet' == denoiser:
 			path_list.append("pretrained_models/fastdvdnet_nodp.pth")
-			model_list.append(FastDVDnet(num_input_frames=5))net(num_input_frames=5))
-
+			model_list.append(FastDVDnet(num_input_frames=5))
 
 	tf = transforms.CenterCrop(args['centercrop']) if args['centercrop'] > 0 else None
 	dataset = videoDataset(args['dataset_path'], extension=args['extension'], nested_subfolders=args['dataset_depth'], transform=tf, max_video_length=args['max_frames'])
@@ -194,7 +169,7 @@ def main(**args):
 		out_filename += str(dl) + '_'
 	out_filename += "probs_"
 	for prob in args['probs']:
-		out_filename += '0-' + str(int(prob*100)) + '_'
+		out_filename += str(prob) + '_'
 	out_filename += "sigmas_"
 	for sigma in args['sigmas']:
 		out_filename += str(sigma) + '_'
@@ -226,7 +201,7 @@ def main(**args):
 					res_dict[model.__class__.__name__][f"s={s}"][f"prob={prob}"][f"sigma={sigma}"] = {}
 					for alpha in args['alphas']:
 						print(f'alpha={alpha}')
-						vid_names, psnrs_noisy, ssims_noisy, psnrs_out, ssims_out, runtimes, psnrs_x_iters, psnrs_z_iters, x_grads_iters, z_grads_iters, x_minus_zs_iters, drs_iters, avg_psnr_noisy, avg_ssim_noisy, avg_psnr_out, avg_ssim_out, avg_runtime = interpolate_video_dataset(model, dataloader, missing_pixels=prob, noise_level=sigma/255., mask_images_equally=args['mask_images_equally'], mask_channels_equally=args['mask_channels_equally'], mask_3d=args['mask_3d'], admm_alpha=alpha, admm_denoiser_level=s/255., admm_iters=args['max_iters'], save_frames=args['save_frames'], save_graphs=args['save_graphs'], output_folder=args['logdir'], device=device, verbose=args['verbose'])
+						vid_names, psnrs_noisy, ssims_noisy, psnrs_out, ssims_out, runtimes, psnrs_x_iters, psnrs_z_iters, x_grads_iters, z_grads_iters, x_minus_zs_iters, drs_iters, avg_psnr_noisy, avg_ssim_noisy, avg_psnr_out, avg_ssim_out, avg_runtime = interpolate_video_dataset(model, dataloader, missing_pixels=prob, noise_level=sigma/255., mask_channels_equally=args['mask_channels_equally'], admm_alpha=alpha, admm_denoiser_level=s/255., admm_iters=args['max_iters'], save_frames=args['save_frames'], save_graphs=args['save_graphs'], output_folder=args['logdir'], device=device, verbose=args['verbose'])
 						res_dict[model.__class__.__name__][f"s={s}"][f"prob={prob}"][f"sigma={sigma}"][f"alpha={alpha}"] = {'avg_psnr_noisy': float(avg_psnr_noisy), 'avg_ssim_noisy': float(avg_ssim_noisy), 'avg_psnr_out': float(avg_psnr_out), 'avg_ssim_out': float(avg_ssim_out), 'avg_runtime': float(avg_runtime)}
 						for v, vid_name in enumerate(vid_names):
 							res_dict[model.__class__.__name__][f"s={s}"][f"prob={prob}"][f"sigma={sigma}"][f"alpha={alpha}"][vid_name] = {'psnr_noisy': float(psnrs_noisy[v]), 'ssim_noisy': float(ssims_noisy[v]), 'psnr_out': float(psnrs_out[v]), 'ssim_out' : float(ssims_out[v]), 'runtime' : runtimes[v], 'psnr_x_iters': psnrs_x_iters[v].tolist(), 'psnr_z_iters': psnrs_z_iters[v].tolist(), 'x_grad_iters': x_grads_iters[v].tolist(), 'z_grad_iters': z_grads_iters[v].tolist(), 'x_minus_z_iters': x_minus_zs_iters[v].tolist(), 'dr_iters': drs_iters[v].tolist()}
@@ -258,26 +233,24 @@ if __name__ == "__main__":
 	parser.add_argument("--logdir", type=str, default='./inpainting_results', help="path to the folder containing the output results")
 	parser.add_argument("--save_frames", action='store_true', help="save videos as images")
 	parser.add_argument("--save_graphs", action='store_true', help="save graphs as images")
-	#Model parameters
-	parser.add_argument("--denoisers", type=str, nargs='+', default=['fastdvdnet'], help="selected model ('fastdvdnet' / 'drunet')")	parser.add_argument("--denoiser_levels", type=float, nargs='+', default=[30.], help="noise level applied to the CNN denoiser (between 0 and 255)")
-	#data parameters
+	# Model parameters
+	parser.add_argument("--denoisers", type=str, nargs='+', default=['fastdvdnet'], help="selected model ('fastdvdnet' / 'drunet')")
+	parser.add_argument("--denoiser_levels", type=float, nargs='+', default=[30.], help="noise level applied to the CNN denoiser (between 0 and 255)")
+	# data parameters
 	parser.add_argument("--dataset_path", type=str, default='./data/subset_4', help="path to the folder of the video dataset")
 	parser.add_argument("--dataset_name", type=str, default='davis_subset4', help="name of the dataset")
 	parser.add_argument("--dataset_depth", type=int, default=1, help="number of nested subfolders in the dataset")
 	parser.add_argument("--extension", type=str, default='.jpg', help="file extension ('.jpg' / '.png')")
 	parser.add_argument("--centercrop", type=int, default=-1, help="center crop size if any (-1 => full res)")
 	parser.add_argument("--max_frames", type=int, default=-1, help="maximum number of frames per video to load (-1 => load all frames)")
-	#pnp-admm parameters
+	# pnp-admm parameters
 	parser.add_argument("--max_iters", type=int, default=200, help="maximum number of pnp-admm iterations")
 	parser.add_argument("--alphas", type=float, nargs='+', default=[2.25], help="admm alpha parameter")
 	parser.add_argument("--sigmas", type=float, nargs='+', default=[0.], help="noise level of the extra AWGN applied during image degradation (between 0 and 255)")
-	parser.add_argument("--probs", type=float, nargs='+',  default=[.9], help="percentage of missing pixels in the inpainting problem")
-	parser.add_argument("--mask_3d", action='store_true', help="mask with different proportion of missing pixels for each image")
-	parser.add_argument("--mask_images_equally", action='store_true', help="mask each image the same way")
+	parser.add_argument("--probs", type=float, nargs='+', default=[.9], help="percentage of missing pixels in the interpolation problem")
 	parser.add_argument("--mask_channels_equally", action='store_true', help="mask all channels in an image the same way")
 
 	argspar = parser.parse_args()
-
 
 	print("\n### Running video PnP-ADMM interpolation ###")
 	print("> Parameters:")

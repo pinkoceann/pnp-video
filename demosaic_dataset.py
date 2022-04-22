@@ -18,7 +18,7 @@ from utils import pytorch_psnr, ssim_video_batch, get_n_params
 from video_utils import tensor_to_images
 from graph_utils import save_graph, save_graph2
 
-from video_denoiser import pytorch_dncnn_video_denoiser, pytorch_ffdnet_video_denoiser, pytorch_drunet_video_denoiser, pytorch_fastdvdnet_video_denoiser
+from video_denoiser import pytorch_drunet_video_denoiser, pytorch_fastdvdnet_video_denoiser
 from proxs import prox_inpainting
 from torch_optim import torch_admm
 from zhang_utils.utils_mosaic import dm_matlab
@@ -82,7 +82,7 @@ def demosaic_video_dataset(model, dataloader, init_type="mosaic", noise_level=0.
 				video = batch['video'].to(device)
 				B, N, C, H, W = video.shape
 				# pad to avoid missing pixels when downscaling
-				pad_H, pad_W = 	2 - H % 2 if H % 2 else 0, 2 - W % 2 if W % 2 else 0
+				pad_H, pad_W = 2 - H % 2 if H % 2 else 0, 2 - W % 2 if W % 2 else 0
 				padding = (0, pad_W, 0, pad_H)
 				video = F.pad(video.view(B*N, C, H, W), padding, mode='reflect').view(B, N, C, H + pad_H, W + pad_W)
 				H, W, = H + pad_H, W + pad_W
@@ -111,7 +111,7 @@ def demosaic_video_dataset(model, dataloader, init_type="mosaic", noise_level=0.
 							init[b, n] = 1./255 * torch.from_numpy(_).float().unsqueeze(0).permute(0, 3, 1, 2).to(device)
 
 				t0 = time.time()
-				restored_video, psnr_x_iters, psnr_z_iters, x_grad_iters, z_grad_iters, x_minus_z_iters, dr_iters = torch_admm(init=init, clean=video, proxF=proxF, proxG=Ds, max_iters=admm_iters, verbose=True if verbose >=3 else False)
+				restored_video, psnr_x_iters, psnr_z_iters, x_grad_iters, z_grad_iters, x_minus_z_iters, dr_iters = torch_admm(init=init, clean=video, proxF=proxF, proxG=Ds, max_iters=admm_iters, verbose=True if verbose >= 3 else False)
 				t_forward = time.time() - t0
 
 				# remove padding and compute psnr
@@ -172,7 +172,6 @@ def demosaic_video_dataset(model, dataloader, init_type="mosaic", noise_level=0.
 	return vid_names, psnrs_noisy, ssims_noisy, psnrs_out, ssims_out, runtimes, psnrs_x_iters, psnrs_z_iters, x_grads_iters, z_grads_iters, x_minus_zs_iters, drs_iters, avg_psnr_noisy, avg_ssim_noisy, avg_psnr_out, avg_ssim_out, avg_runtime
 
 
-
 def main(**args):
 	t_init = time.time()
 
@@ -185,7 +184,7 @@ def main(**args):
 		torch.cuda.manual_seed_all(seed)
 		torch.use_deterministic_algorithms(True)
 
-	gpu=args['gpu']
+	gpu = args['gpu']
 	device = torch.device("cuda:0" if gpu and torch.cuda.is_available() else "cpu")
 	print(f"selected device: {device}")
 
@@ -197,8 +196,7 @@ def main(**args):
 			model_list.append(DRUNet())
 		elif 'fastdvdnet' == denoiser:
 			path_list.append("pretrained_models/fastdvdnet_nodp.pth")
-			model_list.append(FastDVDnet(num_input_frames=5))net(num_input_frames=5))
-
+			model_list.append(FastDVDnet(num_input_frames=5))
 
 	tf = transforms.CenterCrop(args['centercrop']) if args['centercrop'] > 0 else None
 	dataset = videoDataset(args['dataset_path'], extension=args['extension'], nested_subfolders=args['dataset_depth'], transform=tf, max_video_length=args['max_frames'])
@@ -273,22 +271,22 @@ if __name__ == "__main__":
 	parser.add_argument("--logdir", type=str, default='./demosaicking_results', help="path to the folder containing the output results")
 	parser.add_argument("--save_frames", action='store_true', help="save videos as images")
 	parser.add_argument("--save_graphs", action='store_true', help="save graphs as images")
-	#Model parameters
-	parser.add_argument("--denoisers", type=str, nargs='+', default=['fastdvdnet'], help="selected model ('fastdvdnet' / 'drunet')")	parser.add_argument("--denoiser_levels", type=float, nargs='+', default=[20.], help="noise level applied to the CNN denoiser (between 0 and 255)")
-	#data parameters
+	# Model parameters
+	parser.add_argument("--denoisers", type=str, nargs='+', default=['fastdvdnet'], help="selected model ('fastdvdnet' / 'drunet')")
+	parser.add_argument("--denoiser_levels", type=float, nargs='+', default=[20.], help="noise level applied to the CNN denoiser (between 0 and 255)")
+	# data parameters
 	parser.add_argument("--dataset_path", type=str, default='./data/subset_4', help="path to the folder of the video dataset")
 	parser.add_argument("--dataset_name", type=str, default='davis_subset4', help="name of the dataset")
 	parser.add_argument("--dataset_depth", type=int, default=1, help="number of nested subfolders in the dataset")
 	parser.add_argument("--extension", type=str, default='.jpg', help="file extension ('.jpg' / '.png')")
 	parser.add_argument("--centercrop", type=int, default=-1, help="center crop size if any (-1 => full res)")
 	parser.add_argument("--max_frames", type=int, default=-1, help="maximum number of frames per video to load (-1 => load all frames)")
-	#pnp-admm parameters
+	# pnp-admm parameters
 	parser.add_argument("--max_iters", type=int, default=200, help="maximum number of pnp-admm iterations")
 	parser.add_argument("--alphas", type=float, nargs='+', default=[0.25], help="admm alpha parameter")
 	parser.add_argument("--sigmas", type=float, nargs='+', default=[0.], help="noise level of the extra AWGN applied during image degradation (between 0 and 255)")
 	parser.add_argument("--init", type=str, default='mosaic', help="init type ('mosaic' / 'matlab' / 'cv2')")
 	argspar = parser.parse_args()
-
 
 	print("\n### Running video PnP-ADMM demosaicking ###")
 	print("> Parameters:")

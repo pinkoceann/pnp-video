@@ -28,34 +28,32 @@ from sr_dataset import lr_video
 from deblur_dataset_dpir import pytorch_drunet_image_denoiser
 
 
-def sr_video_dataset(model, dataloader, kernel="gaussian25-1.6", scale_factor=2, x8=False, noise_level=1./255, max_denoiser_level=49./255, max_iters=24, save_frames=False, save_graphs=False, output_folder=None, device=torch.device("cpu"), verbose=1):
-
+def sr_video_dataset(model, dataloader, kernel="gaussian25-1.6", scale_factor=2, x8=False, noise_level=1./255, max_denoiser_level=49./255, max_iters=24, save_frames=False, output_folder=None, device=torch.device("cpu"), verbose=1):
 	# set PnP-HQS parameters
 	rhos, sigmas = utils_pnp.get_rho_sigma(sigma=max(0.255/255., noise_level), iter_num=max_iters, modelSigma1=max_denoiser_level*255, modelSigma2=max(scale_factor, noise_level*255.), w=1)
 	rhos, sigmas = torch.tensor(rhos).to(device), torch.tensor(sigmas).to(device)
 	if verbose >= 2:
 		print(f"denoiser range = [{sigmas[0]:.3f}, {sigmas[-1]:.3f}], sigma={noise_level} => rho range = [{rhos[0]:.3f}, {rhos[-1]:.3f}]")
 
-
 	# set the blur kernel
-	if kernel=="uniform-9":
+	if kernel == "uniform-9":
 		kernel_size = 9
 		ker = torch.ones((kernel_size, kernel_size), device=device) / (kernel_size**2)
-	elif kernel=="gaussian-9-3":
-		a = np.zeros((9,9))
-		a[4,4] = 1
+	elif kernel == "gaussian-9-3":
+		a = np.zeros((9, 9))
+		a[4, 4] = 1
 		ker = torch.from_numpy(gaussian(a, sigma=3))
-	elif kernel=="gaussian11-5":
-		a = np.zeros((11,11))
-		a[5,5] = 1
+	elif kernel == "gaussian11-5":
+		a = np.zeros((11, 11))
+		a[5, 5] = 1
 		ker = torch.from_numpy(gaussian(a, sigma=5))
-	elif kernel=="gaussian25-1.6":
-		a = np.zeros((25,25))
-		a[12,12] = 1
+	elif kernel == "gaussian25-1.6":
+		a = np.zeros((25, 25))
+		a[12, 12] = 1
 		ker = torch.from_numpy(gaussian(a, sigma=1.6))
-	elif kernel=="gaussian25-3.2":
-		a = np.zeros((25,25))
-		a[12,12] = 1
+	elif kernel == "gaussian25-3.2":
+		a = np.zeros((25, 25))
+		a[12, 12] = 1
 		ker = torch.from_numpy(gaussian(a, sigma=3.2))
 	k_tensor = ker.float().unsqueeze(0).unsqueeze(0).to(device)
 
@@ -65,7 +63,7 @@ def sr_video_dataset(model, dataloader, kernel="gaussian25-1.6", scale_factor=2,
 				video = batch['video'].to(device)
 				B, N, C, H, W = video.shape
 				# pad to avoid missing pixels when downscaling
-				pad_H, pad_W = 	scale_factor - H % scale_factor if H % scale_factor else 0, scale_factor - W % scale_factor if W % scale_factor else 0
+				pad_H, pad_W = scale_factor - H % scale_factor if H % scale_factor else 0, scale_factor - W % scale_factor if W % scale_factor else 0
 				padding = (0, pad_W, 0, pad_H)
 				video = F.pad(video.view(B*N, C, H, W), padding, mode='reflect').view(B, N, C, H + pad_H, W + pad_W)
 				H, W, = H + pad_H, W + pad_W
@@ -73,31 +71,31 @@ def sr_video_dataset(model, dataloader, kernel="gaussian25-1.6", scale_factor=2,
 				# generate the blur
 				blur = torch.zeros(H, W, device=device)
 				li, lj = ker.shape[0], ker.shape[1]
-				ci, cj = li // 2, lj //2
+				ci, cj = li // 2, lj // 2
 				blur[:ci + 1, :cj + 1] = ker[ci:, cj:]
 				blur[:ci + 1, -cj:] = ker[ci:, :cj]
 				blur[-ci:, :cj + 1] = ker[:ci, cj:]
 				blur[-ci:, -cj:] = ker[:ci, :cj]
 				blur = blur.view(1, 1, 1, H, W)
-				blur_fft=torch.fft.fft2(blur)
+				blur_fft = torch.fft.fft2(blur)
 				
 				# generate the degraded video
 				degraded_video = lr_video(video, blur_fft, scale_factor, noise_level)
 
 				# initialize with bicubically upsampled degraded video
-				video_cv2 = degraded_video.cpu().permute(0,1,3,4,2).numpy()
-				init_np = torch.zeros_like(video).cpu().permute(0,1,3,4,2).numpy()
+				video_cv2 = degraded_video.cpu().permute(0, 1, 3, 4, 2).numpy()
+				init_np = torch.zeros_like(video).cpu().permute(0, 1, 3, 4, 2).numpy()
 				for _ in range(B):
 					for n in range(N):
 						joj = video_cv2[_, n]
 						jij = cv2.resize(joj, (W, H), interpolation=cv2.INTER_CUBIC)
 						init_np[_, n] = jij
-				init = torch.from_numpy(init_np).permute(0,1,4,2,3).to(device)
+				init = torch.from_numpy(init_np).permute(0, 1, 4, 2, 3).to(device)
 				restored_video = torch.empty_like(video)
 
 				t0 = time.time()
 				for n, img in enumerate(degraded_video[0]):  # for each image
-					if verbose >=3:
+					if verbose >= 3:
 						print(f"processing image {n+1}/{N}")
 					img_L_tensor = img.unsqueeze(0)
 					x = init[0, n].unsqueeze(0)
@@ -161,7 +159,6 @@ def sr_video_dataset(model, dataloader, kernel="gaussian25-1.6", scale_factor=2,
 	return vid_names, psnrs_noisy, ssims_noisy, psnrs_out, ssims_out, runtimes, avg_psnr_noisy, avg_ssim_noisy, avg_psnr_out, avg_ssim_out, avg_runtime, ker.cpu().numpy()
 
 
-
 def main(**args):
 	t_init = time.time()
 
@@ -174,7 +171,7 @@ def main(**args):
 		torch.cuda.manual_seed_all(seed)
 		torch.use_deterministic_algorithms(True)
 
-	gpu=args['gpu']
+	gpu = args['gpu']
 	device = torch.device("cuda:0" if gpu and torch.cuda.is_available() else "cpu")
 	print(f"selected device: {device}")
 
@@ -184,7 +181,6 @@ def main(**args):
 		if 'drunet' == denoiser:
 			path_list.append("pretrained_models/drunet_color.pth")
 			model_list.append(DRUNet())
-
 	tf = transforms.CenterCrop(args['centercrop']) if args['centercrop'] > 0 else None
 	dataset = videoDataset(args['dataset_path'], extension=args['extension'], nested_subfolders=args['dataset_depth'], transform=tf, max_video_length=args['max_frames'])
 	print(f'created a dataset of {len(dataset)} videos.')
@@ -200,7 +196,7 @@ def main(**args):
 	out_filename += "s_"
 	for dl in args['max_denoiser_levels']:
 		out_filename += str(dl) + '_'
-	out_filename += "kernel_" +	args['kernel'] + '_'
+	out_filename += "kernel_" + args['kernel'] + '_'
 	out_filename += "sf_"
 	for sf in args['scale_factors']:
 		out_filename += str(sf) + '_'
@@ -230,7 +226,7 @@ def main(**args):
 				res_dict[model.__class__.__name__][f"s={s}"][f"sf={sf}"] = {}
 				for sigma in args['sigmas']:
 					print(f'sigma={sigma}')
-					vid_names, psnrs_noisy, ssims_noisy, psnrs_out, ssims_out, runtimes, avg_psnr_noisy, avg_ssim_noisy, avg_psnr_out, avg_ssim_out, avg_runtime, kernel = sr_video_dataset(model, dataloader, kernel=args['kernel'], scale_factor=sf, x8=args['x8'], noise_level=sigma/255., max_denoiser_level=s/255., max_iters=args['max_iters'], save_frames=args['save_frames'], save_graphs=args['save_graphs'], output_folder=args['logdir'], device=device, verbose=args['verbose'])
+					vid_names, psnrs_noisy, ssims_noisy, psnrs_out, ssims_out, runtimes, avg_psnr_noisy, avg_ssim_noisy, avg_psnr_out, avg_ssim_out, avg_runtime, kernel = sr_video_dataset(model, dataloader, kernel=args['kernel'], scale_factor=sf, x8=args['x8'], noise_level=sigma/255., max_denoiser_level=s/255., max_iters=args['max_iters'], save_frames=args['save_frames'], output_folder=args['logdir'], device=device, verbose=args['verbose'])
 					if no_kernel:
 						res_dict['kernel'] = kernel.tolist()
 						no_kernel = False
@@ -263,25 +259,23 @@ if __name__ == "__main__":
 	parser.set_defaults(gpu=True)
 	parser.add_argument("--logdir", type=str, default='./sr_results', help="path to the folder containing the output results")
 	parser.add_argument("--save_frames", action='store_true', help="save videos as images")
-	parser.add_argument("--save_graphs", action='store_true', help="save graphs as images")
-	#Model parameters
+	# Model parameters
 	parser.add_argument("--denoisers", type=str, nargs='+', default=['drunet'], help="selected model ('drunet')")
-	parser.add_argument("--max_denoiser_levels", type=float,nargs='+', default=[49], help="maximum noise level applied to the CNN denoiser (between 0 and 255)")
+	parser.add_argument("--max_denoiser_levels", type=float, nargs='+', default=[49], help="maximum noise level applied to the CNN denoiser (between 0 and 255)")
 	parser.add_argument('--x8', action='store_true', help='use geometric self-ensemble (flip / rotate input before denoising in one of 8 different ways each iteration)')
-	#data parameters
+	# data parameters
 	parser.add_argument("--dataset_path", type=str, default='./data/subset_4', help="path to the folder of the video dataset")
 	parser.add_argument("--dataset_name", type=str, default='davis_subset4', help="name of the dataset")
 	parser.add_argument("--dataset_depth", type=int, default=1, help="number of nested subfolders in the dataset")
 	parser.add_argument("--extension", type=str, default='.jpg', help="file extension ('.jpg' / '.png')")
 	parser.add_argument("--centercrop", type=int, default=-1, help="center crop size if any (-1 => full res)")
 	parser.add_argument("--max_frames", type=int, default=-1, help="maximum number of frames per video to load (-1 => load all frames)")
-	#pnp-admm parameters
+	# pnp-admm parameters
 	parser.add_argument("--max_iters", type=int, default=24, help="maximum number of pnp-hqs iterations")
 	parser.add_argument("--sigmas", type=float, nargs='+', default=[0.], help="noise level of the extra AWGN applied during image degradation (between 0 and 255)")
 	parser.add_argument("--kernel", type=str, default='gaussian25-1.6', help="blur kernel (uniform-9 / gaussian-9-3 / gaussian11-5 / gaussian25-1.6)")
-	parser.add_argument("--scale_factors", type=int, nargs='+',  default=[2], help="downsampling / upsampling scale factor for SR")
+	parser.add_argument("--scale_factors", type=int, nargs='+', default=[2], help="downsampling / upsampling scale factor for SR")
 	argspar = parser.parse_args()
-
 
 	print("\n### Running DPIR for video SR ###")
 	print("> Parameters:")

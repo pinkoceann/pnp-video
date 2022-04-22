@@ -14,7 +14,7 @@ from models.network_fastdvdnet import FastDVDnet
 from image_datasets import videoDataset
 from utils import pytorch_psnr, ssim_video_batch, get_n_params
 
-from video_denoiser import pytorch_dncnn_video_denoiser, pytorch_ffdnet_video_denoiser, pytorch_drunet_video_denoiser, pytorch_fastdvdnet_video_denoiser
+from video_denoiser import pytorch_drunet_video_denoiser, pytorch_fastdvdnet_video_denoiser
 from video_utils import tensor_to_images
 
 
@@ -30,11 +30,7 @@ def denoise_video_dataset(model, dataloader, noise_level=40./255, save_frames=Fa
 				noise = torch.normal(mean=torch.zeros_like(video), std=noise_level)
 				noisy_video = video + noise
 				t0 = time.time()
-				if isinstance(model, DnCNN):
-					denoised_video = pytorch_dncnn_video_denoiser(noisy_video, model, noise_level, model_device=device, output_device=device)
-				elif isinstance(model, FFDNet):
-					denoised_video = pytorch_ffdnet_video_denoiser(noisy_video, model, noise_level, model_device=device, output_device=device)
-				elif isinstance(model, DRUNet):
+				if isinstance(model, DRUNet):
 					denoised_video = pytorch_drunet_video_denoiser(noisy_video, model, noise_level, model_device=device, output_device=device)
 				elif isinstance(model, FastDVDnet):
 					denoised_video = pytorch_fastdvdnet_video_denoiser(noisy_video, model, noise_level, model_device=device, output_device=device)
@@ -98,8 +94,7 @@ def main(**args):
 			model_list.append(DRUNet())
 		elif 'fastdvdnet' == denoiser:
 			path_list.append("pretrained_models/fastdvdnet_nodp.pth")
-			model_list.append(FastDVDnet(num_input_frames=5))net(num_input_frames=5))
-
+			model_list.append(FastDVDnet(num_input_frames=5))
 	tf = transforms.CenterCrop(args['centercrop']) if args['centercrop'] > 0 else None
 	dataset = videoDataset(args['dataset_path'], extension=args['extension'], nested_subfolders=args['dataset_depth'], transform=tf, max_video_length=args['max_frames'])
 	print(f'created a dataset of {len(dataset)} videos.')
@@ -160,8 +155,9 @@ if __name__ == "__main__":
 	parser.set_defaults(gpu=True)
 	parser.add_argument("--logdir", type=str, default='./denoising_results', help="path to the folder containing the output results")
 	parser.add_argument("--save_frames", action='store_true', help="save videos as images")
-	#Model parameters
-	parser.add_argument("--denoisers", type=str, nargs='+', default=['fastdvdnet'], help="selected model ('fastdvdnet' / 'drunet')")	#data parameters
+	# Model parameters
+	parser.add_argument("--denoisers", type=str, nargs='+', default=['fastdvdnet'], help="selected model ('fastdvdnet' / 'drunet')")
+	# data parameters
 	parser.add_argument("--dataset_path", type=str, default='./data/subset_4', help="path to the folder of the video dataset")
 	parser.add_argument("--dataset_name", type=str, default='davis_subset4', help="name of the dataset")
 	parser.add_argument("--dataset_depth", type=int, default=1, help="number of nested subfolders in the dataset")
@@ -171,7 +167,6 @@ if __name__ == "__main__":
 	parser.add_argument("--sigmas", type=float, nargs='+', default=[10.], help="noise level of the extra AWGN applied during image degradation (between 0 and 255)")
 
 	argspar = parser.parse_args()
-
 
 	print("\n### Running video denoising ###")
 	print("> Parameters:")

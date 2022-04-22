@@ -23,7 +23,7 @@ from utils import pytorch_psnr, ssim_video_batch, get_n_params
 from video_utils import tensor_to_images
 from graph_utils import save_graph, save_graph2
 
-from video_denoiser import pytorch_dncnn_video_denoiser, pytorch_ffdnet_video_denoiser, pytorch_drunet_video_denoiser, pytorch_fastdvdnet_video_denoiser
+from video_denoiser import pytorch_drunet_video_denoiser, pytorch_fastdvdnet_video_denoiser
 from proxs import prox_deblurring
 from torch_optim import torch_admm
 
@@ -53,22 +53,22 @@ def deblur_video_dataset(model, dataloader, kernel="randomLevin", noise_level=2.
 		Ds = lambda x: pytorch_fastdvdnet_video_denoiser(x, model, admm_denoiser_level, model_device=device, output_device=device)
 
 	# set the blur kernel
-	if kernel=="uniform":
+	if kernel == "uniform":
 		kernel_size = 9
 		ker = torch.ones((kernel_size, kernel_size), device=device) / (kernel_size**2)
-	elif kernel=="gaussian3":
-		a = np.zeros((9,9))
-		a[4,4] = 1
+	elif kernel == "gaussian3":
+		a = np.zeros((9, 9))
+		a[4, 4] = 1
 		ker = torch.from_numpy(gaussian(a, sigma=3))
-	elif kernel=="gaussian5":
-		a = np.zeros((11,11))
-		a[5,5] = 1
+	elif kernel == "gaussian5":
+		a = np.zeros((11, 11))
+		a[5, 5] = 1
 		ker = torch.from_numpy(gaussian(a, sigma=5))
-	elif kernel=="gaussian25-1.6":
-		a = np.zeros((25,25))
-		a[12,12] = 1
+	elif kernel == "gaussian25-1.6":
+		a = np.zeros((25, 25))
+		a[12, 12] = 1
 		ker = torch.from_numpy(gaussian(a, sigma=1.6))
-	elif kernel=="randomLevin":
+	elif kernel == "randomLevin":
 		kernels = hdf5storage.loadmat(os.path.join('kernels', 'Levin09.mat'))['kernels']
 
 	vid_names, psnrs_noisy, psnrs_out, ssims_noisy, ssims_out, psnrs_x_iters, psnrs_z_iters, x_grads_iters, z_grads_iters, x_minus_zs_iters, drs_iters, runtimes = [], [], [], [], [], [], [], [], [], [], [], []
@@ -81,7 +81,7 @@ def deblur_video_dataset(model, dataloader, kernel="randomLevin", noise_level=2.
 				assert B == 1, "this code only works with batch size 1 for now"
 
 				# generate the blur
-				if kernel=="randomLevin":
+				if kernel == "randomLevin":
 					blur = torch.zeros(B, N, 1, H, W, device=device)
 					# randomly select one of the 8 blur kernels for each image
 					per_frame_kernel_indexes = []
@@ -91,7 +91,7 @@ def deblur_video_dataset(model, dataloader, kernel="randomLevin", noise_level=2.
 						ker = torch.from_numpy(kernels[0, ker_idx])
 					# blur = torch.zeros(H, W, device=device)
 						li, lj = ker.shape[0], ker.shape[1]
-						ci, cj = li // 2, lj //2
+						ci, cj = li // 2, lj // 2
 						blur[:, _, :, :ci + 1, :cj + 1] = ker[ci:, cj:]
 						blur[:, _, :, :ci + 1, -cj:] = ker[ci:, :cj]
 						blur[:, _, :, -ci:, :cj + 1] = ker[:ci, cj:]
@@ -99,13 +99,13 @@ def deblur_video_dataset(model, dataloader, kernel="randomLevin", noise_level=2.
 				else:
 					blur = torch.zeros(H, W, device=device)
 					li, lj = ker.shape[0], ker.shape[1]
-					ci, cj = li // 2, lj //2
+					ci, cj = li // 2, lj // 2
 					blur[:ci + 1, :cj + 1] = ker[ci:, cj:]
 					blur[:ci + 1, -cj:] = ker[ci:, :cj]
 					blur[-ci:, :cj + 1] = ker[:ci, cj:]
 					blur[-ci:, -cj:] = ker[:ci, :cj]
 					blur = blur.view(1, 1, 1, H, W)
-				blur_fft=torch.fft.fft2(blur)
+				blur_fft = torch.fft.fft2(blur)
 
 				# generate the degraded video
 				degraded_video = blur_video(video, blur_fft, noise_level)
@@ -116,7 +116,7 @@ def deblur_video_dataset(model, dataloader, kernel="randomLevin", noise_level=2.
 				init = degraded_video.clone()  # initialize with the degraded video
 
 				t0 = time.time()
-				restored_video, psnr_x_iters, psnr_z_iters, x_grad_iters, z_grad_iters, x_minus_z_iters, dr_iters = torch_admm(init=init, clean=video, proxF=proxF, proxG=Ds, max_iters=admm_iters, verbose=True if verbose >=3 else False)
+				restored_video, psnr_x_iters, psnr_z_iters, x_grad_iters, z_grad_iters, x_minus_z_iters, dr_iters = torch_admm(init=init, clean=video, proxF=proxF, proxG=Ds, max_iters=admm_iters, verbose=True if verbose >= 3 else False)
 				t_forward = time.time() - t0
 
 				# compute psnr
@@ -172,7 +172,7 @@ def deblur_video_dataset(model, dataloader, kernel="randomLevin", noise_level=2.
 	if verbose >= 1:
 		print(f'model: {model.__class__.__name__:<18} PSNR/SSIM noisy: {avg_psnr_noisy:<2.2f}/{avg_ssim_noisy:.4f}, PSNR/SSIM out: {avg_psnr_out:<2.2f}/{avg_ssim_out:.4f} \t runtime: {avg_runtime:.3f}s/frame\n')
 
-	if kernel=="randomLevin":
+	if kernel == "randomLevin":
 		ker = []
 		for k in kernels[0]:
 			ker.append(k.tolist())
@@ -207,7 +207,6 @@ def main(**args):
 		elif 'fastdvdnet' == denoiser:
 			path_list.append("pretrained_models/fastdvdnet_nodp.pth")
 			model_list.append(FastDVDnet(num_input_frames=5))
-
 	tf = transforms.CenterCrop(args['centercrop']) if args['centercrop'] > 0 else None
 	dataset = videoDataset(args['dataset_path'], extension=args['extension'], nested_subfolders=args['dataset_depth'], transform=tf, max_video_length=args['max_frames'])
 	print(f'created a dataset of {len(dataset)} videos.')
@@ -222,7 +221,7 @@ def main(**args):
 	out_filename += "s_"
 	for dl in args['denoiser_levels']:
 		out_filename += str(dl) + '_'
-	out_filename += "kernel_" +	args['kernel'] + '_'
+	out_filename += "kernel_" + args['kernel'] + '_'
 	out_filename += "sigmas_"
 	for sigma in args['sigmas']:
 		out_filename += str(sigma) + '_'
@@ -252,7 +251,7 @@ def main(**args):
 				res_dict[model.__class__.__name__][f"s={s}"][f"sigma={sigma}"] = {}
 				for alpha in args['alphas']:
 					print(f'alpha={alpha}')
-					vid_names, psnrs_noisy, ssims_noisy, psnrs_out, ssims_out, runtimes, psnrs_x_iters, psnrs_z_iters, x_grads_iters, z_grads_iters, x_minus_zs_iters, drs_iters, avg_psnr_noisy, avg_ssim_noisy, avg_psnr_out, avg_ssim_out, avg_runtime, kernel = deblur_video_dataset(model, dataloader, kernel=args['kernel'], noise_level=sigma/255., admm_alpha=alpha, admm_denoiser_level=s/255., admm_iters=args['max_iters'], save_frames=args['save_frames'], save_graphs=args['save_graphs'], output_folder=args['logdir'], device=device,  verbose=args['verbose'])
+					vid_names, psnrs_noisy, ssims_noisy, psnrs_out, ssims_out, runtimes, psnrs_x_iters, psnrs_z_iters, x_grads_iters, z_grads_iters, x_minus_zs_iters, drs_iters, avg_psnr_noisy, avg_ssim_noisy, avg_psnr_out, avg_ssim_out, avg_runtime, kernel = deblur_video_dataset(model, dataloader, kernel=args['kernel'], noise_level=sigma/255., admm_alpha=alpha, admm_denoiser_level=s/255., admm_iters=args['max_iters'], save_frames=args['save_frames'], save_graphs=args['save_graphs'], output_folder=args['logdir'], device=device, verbose=args['verbose'])
 					if no_kernel:
 						res_dict['kernel'] = kernel
 						no_kernel = False
@@ -286,23 +285,23 @@ if __name__ == "__main__":
 	parser.add_argument("--logdir", type=str, default='./deblurring_results', help="path to the folder containing the output results")
 	parser.add_argument("--save_frames", action='store_true', help="save videos as images")
 	parser.add_argument("--save_graphs", action='store_true', help="save graphs as images")
-	#Model parameters
-	parser.add_argument("--denoisers", type=str, nargs='+', default=['fastdvdnet'], help="selected model ('fastdvdnet' / 'drunet')")	parser.add_argument("--denoiser_levels", type=float, nargs='+', default=[20.], help="noise level applied to the CNN denoiser (between 0 and 255)")
-	#data parameters
+	# Model parameters
+	parser.add_argument("--denoisers", type=str, nargs='+', default=['fastdvdnet'], help="selected model ('fastdvdnet' / 'drunet')")
+	parser.add_argument("--denoiser_levels", type=float, nargs='+', default=[20.], help="noise level applied to the CNN denoiser (between 0 and 255)")
+	# data parameters
 	parser.add_argument("--dataset_path", type=str, default='./data/subset_4', help="path to the folder of the video dataset")
 	parser.add_argument("--dataset_name", type=str, default='davis_subset4', help="name of the dataset")
 	parser.add_argument("--dataset_depth", type=int, default=1, help="number of nested subfolders in the dataset")
 	parser.add_argument("--extension", type=str, default='.jpg', help="file extension ('.jpg' / '.png')")
 	parser.add_argument("--centercrop", type=int, default=-1, help="center crop size if any (-1 => full res)")
 	parser.add_argument("--max_frames", type=int, default=-1, help="maximum number of frames per video to load (-1 => load all frames)")
-	#pnp-admm parameters
+	# pnp-admm parameters
 	parser.add_argument("--max_iters", type=int, default=20, help="maximum number of pnp-admm iterations")
 	parser.add_argument("--alphas", type=float, nargs='+', default=[1.], help="admm alpha parameter")
 	parser.add_argument("--sigmas", type=float, nargs='+', default=[2.55], help="noise level of the extra AWGN applied during image degradation (between 0 and 255)")
 	parser.add_argument("--kernel", type=str, default='randomLevin', help="blur kernel (randomLevin / uniform-9 / gaussian-9-3 / gaussian11-5 / gaussian25-1.6)")
 
 	argspar = parser.parse_args()
-
 
 	print("\n### Running video PnP-ADMM deblurring ###")
 	print("> Parameters:")

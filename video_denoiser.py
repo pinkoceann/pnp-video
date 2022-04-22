@@ -33,7 +33,7 @@ def pytorch_drunet_video_denoiser(video, model, noise_level, model_device, outpu
 	denoised_video = torch.empty((B, N, C, H, W), device=output_device)
 
 	# pad to fit the 3 U-Net downsamplings if needed
-	pad_H, pad_W = 	8 - H % 8 if H % 8 else 0, 8 - W % 8 if W % 8 else 0
+	pad_H, pad_W = 8 - H % 8 if H % 8 else 0, 8 - W % 8 if W % 8 else 0
 	padding = (0, pad_W, 0, pad_H)
 	H2, W2, = H + pad_H, W + pad_W
 	video_pad = F.pad(video.view(B*N, C, H, W), padding, mode='reflect').view(B, N, C, H2, W2)
@@ -71,7 +71,7 @@ def pytorch_fastdvdnet_video_denoiser(video, model, noise_level, model_device, o
 	video_pad[:, :2] = video[:, 1:3].flip((1,))
 	video_pad[:, -2:] = video[:, -3:-1].flip((1,))
 	# pad to fit the 2 U-Net downsamplings if needed
-	pad_H, pad_W = 	4 - H % 4 if H % 4 else 0, 4 - W % 4 if W % 4 else 0
+	pad_H, pad_W = 4 - H % 4 if H % 4 else 0, 4 - W % 4 if W % 4 else 0
 	padding = (0, pad_W, 0, pad_H)
 	N2, H2, W2, = N + 4,  H + pad_H, W + pad_W
 	video_pad = F.pad(video_pad.view(B*N2, C, H, W), padding, mode='reflect').view(B, N2, C, H2, W2)

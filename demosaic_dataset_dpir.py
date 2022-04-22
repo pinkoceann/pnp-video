@@ -27,8 +27,7 @@ from demosaic_dataset import mosaic_mask_video
 from deblur_dataset_dpir import pytorch_drunet_image_denoiser
 
 
-def demosaic_video_dataset(model, dataloader, x8=False, init_type="matlab", noise_level=1./255, max_denoiser_level=49./255, max_iters=24, save_frames=False, save_graphs=False, output_folder=None, device=torch.device("cpu"), verbose=1):
-
+def demosaic_video_dataset(model, dataloader, x8=False, init_type="matlab", noise_level=1./255, max_denoiser_level=49./255, max_iters=24, save_frames=False, output_folder=None, device=torch.device("cpu"), verbose=1):
 	# set PnP-HQS parameters
 	rhos, sigmas = utils_pnp.get_rho_sigma(sigma=max(0.255/255., noise_level), iter_num=max_iters, modelSigma1=max_denoiser_level*255, modelSigma2=max(0.6, noise_level*255.), w=1)
 	rhos, sigmas = torch.tensor(rhos).to(device), torch.tensor(sigmas).to(device)
@@ -42,7 +41,7 @@ def demosaic_video_dataset(model, dataloader, x8=False, init_type="matlab", nois
 				B, N, C, H, W = video.shape
 				assert B == 1, "this code only works with batch size 1 for now"
 				# pad to avoid missing pixels when downscaling
-				pad_H, pad_W = 	2 - H % 2 if H % 2 else 0, 2 - W % 2 if W % 2 else 0
+				pad_H, pad_W = 2 - H % 2 if H % 2 else 0, 2 - W % 2 if W % 2 else 0
 				padding = (0, pad_W, 0, pad_H)
 				video = F.pad(video.view(B*N, C, H, W), padding, mode='reflect').view(B, N, C, H + pad_H, W + pad_W)
 				H, W, = H + pad_H, W + pad_W
@@ -70,7 +69,7 @@ def demosaic_video_dataset(model, dataloader, x8=False, init_type="matlab", nois
 
 				t0 = time.time()
 				for n, img in enumerate(degraded_video[0]):  # for each image
-					if verbose >=3:
+					if verbose >= 3:
 						print(f"processing image {n+1}/{N}")
 
 					y = img.unsqueeze(0)  # observation: mosaicked image
@@ -137,7 +136,6 @@ def demosaic_video_dataset(model, dataloader, x8=False, init_type="matlab", nois
 	return vid_names, psnrs_noisy, ssims_noisy, psnrs_out, ssims_out, runtimes, avg_psnr_noisy, avg_ssim_noisy, avg_psnr_out, avg_ssim_out, avg_runtime
 
 
-
 def main(**args):
 	t_init = time.time()
 
@@ -150,7 +148,7 @@ def main(**args):
 		torch.cuda.manual_seed_all(seed)
 		torch.use_deterministic_algorithms(True)
 
-	gpu=args['gpu']
+	gpu = args['gpu']
 	device = torch.device("cuda:0" if gpu and torch.cuda.is_available() else "cpu")
 	print(f"selected device: {device}")
 
@@ -160,7 +158,6 @@ def main(**args):
 		if 'drunet' == denoiser:
 			path_list.append("pretrained_models/drunet_color.pth")
 			model_list.append(DRUNet())
-
 	tf = transforms.CenterCrop(args['centercrop']) if args['centercrop'] > 0 else None
 	dataset = videoDataset(args['dataset_path'], extension=args['extension'], nested_subfolders=args['dataset_depth'], transform=tf, max_video_length=args['max_frames'])
 	print(f'created a dataset of {len(dataset)} videos.')
@@ -198,7 +195,7 @@ def main(**args):
 			res_dict[model.__class__.__name__][f"s={s}"] = {}
 			for sigma in args['sigmas']:
 				print(f'sigma={sigma}')
-				vid_names, psnrs_noisy, ssims_noisy, psnrs_out, ssims_out, runtimes, avg_psnr_noisy, avg_ssim_noisy, avg_psnr_out, avg_ssim_out, avg_runtime = demosaic_video_dataset(model, dataloader, x8=args['x8'], init_type=args['init'], noise_level=sigma/255., max_denoiser_level=s/255., max_iters=args['max_iters'], save_frames=args['save_frames'], save_graphs=args['save_graphs'], output_folder=args['logdir'], device=device, verbose=args['verbose'])
+				vid_names, psnrs_noisy, ssims_noisy, psnrs_out, ssims_out, runtimes, avg_psnr_noisy, avg_ssim_noisy, avg_psnr_out, avg_ssim_out, avg_runtime = demosaic_video_dataset(model, dataloader, x8=args['x8'], init_type=args['init'], noise_level=sigma/255., max_denoiser_level=s/255., max_iters=args['max_iters'], save_frames=args['save_frames'], output_folder=args['logdir'], device=device, verbose=args['verbose'])
 				res_dict[model.__class__.__name__][f"s={s}"][f"sigma={sigma}"] = {'avg_psnr_noisy': float(avg_psnr_noisy), 'avg_ssim_noisy': float(avg_ssim_noisy), 'avg_psnr_out': float(avg_psnr_out), 'avg_ssim_out': float(avg_ssim_out), 'avg_runtime': float(avg_runtime)}
 				for v, vid_name in enumerate(vid_names):
 					res_dict[model.__class__.__name__][f"s={s}"][f"sigma={sigma}"][vid_name] = {'psnr_noisy': float(psnrs_noisy[v]), 'ssim_noisy': float(ssims_noisy[v]), 'psnr_out': float(psnrs_out[v]), 'ssim_out' : float(ssims_out[v]), 'runtime' : runtimes[v]}
@@ -228,24 +225,22 @@ if __name__ == "__main__":
 	parser.set_defaults(gpu=True)
 	parser.add_argument("--logdir", type=str, default='./demosaicking_results', help="path to the folder containing the output results")
 	parser.add_argument("--save_frames", action='store_true', help="save videos as images")
-	parser.add_argument("--save_graphs", action='store_true', help="save graphs as images")
-	#Model parameters
+	# Model parameters
 	parser.add_argument("--denoisers", type=str, nargs='+', default=['drunet'], help="selected model ('drunet')")
-	parser.add_argument("--max_denoiser_levels", type=float,nargs='+', default=[49], help="maximum noise level applied to the CNN denoiser (between 0 and 255)")
+	parser.add_argument("--max_denoiser_levels", type=float, nargs='+', default=[49], help="maximum noise level applied to the CNN denoiser (between 0 and 255)")
 	parser.add_argument('--x8', action='store_true', help='use geometric self-ensemble (flip / rotate input before denoising in one of 8 different ways each iteration)')
-	#data parameters
+	# data parameters
 	parser.add_argument("--dataset_path", type=str, default='./data/subset_4', help="path to the folder of the video dataset")
 	parser.add_argument("--dataset_name", type=str, default='davis_subset4', help="name of the dataset")
 	parser.add_argument("--dataset_depth", type=int, default=1, help="number of nested subfolders in the dataset")
 	parser.add_argument("--extension", type=str, default='.jpg', help="file extension ('.jpg' / '.png')")
 	parser.add_argument("--centercrop", type=int, default=-1, help="center crop size if any (-1 => full res)")
 	parser.add_argument("--max_frames", type=int, default=-1, help="maximum number of frames per video to load (-1 => load all frames)")
-	#pnp-admm parameters
+	# pnp-admm parameters
 	parser.add_argument("--max_iters", type=int, default=40, help="maximum number of pnp-hqs iterations")
 	parser.add_argument("--sigmas", type=float, nargs='+', default=[5], help="noise level of the extra AWGN applied during image degradation (between 0 and 255)")
 	parser.add_argument("--init", type=str, default='matlab', help="init type ('matlab' / 'cv2' / 'mosaic')")
 	argspar = parser.parse_args()
-
 
 	print("\n### Running DPIR for video demosaicking ###")
 	print("> Parameters:")
