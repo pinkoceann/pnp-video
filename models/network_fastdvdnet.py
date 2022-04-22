@@ -2,7 +2,7 @@
 
 Code adapted by amonod
 Definition of the FastDVDnet model
-Derived from original FastDVDnet code at https://github.com/m-tassano/fastdvdnet/blob/master/models.py
+Derived from original FastDVDnet code
 
 This program is free software: you can use, modify and/or
 redistribute it under the terms of the GNU General Public
