@@ -165,7 +165,7 @@ def deblur_video_dataset(model, dataloader, kernel="randomLevin", x8=False, nois
 				ssim_out = ssim_video_batch(video, restored_video, data_range=1.)
 				runtime = t_forward / (B * N)
 				if verbose >= 2:
-					print(f"video: {batch['video_name'][0]:<18} PSNR/SSIM noisy: {psnr_noisy:<2.2f}/{ssim_noisy:.4f}, PSNR/SSIM out: {psnr_out:<2.2f}/{ssim_out:.4f} \t runtime: {runtime:.3f}s/frame")
+					print(f"video: {batch['video_name'][0]:<18} PSNR/SSIM observation: {psnr_noisy:<2.2f}/{ssim_noisy:.4f}, PSNR/SSIM out: {psnr_out:<2.2f}/{ssim_out:.4f} \t runtime: {runtime:.3f}s/frame")
 				vid_names.append(str(batch['video_name'][0]))
 				psnrs_noisy.append(psnr_noisy)
 				psnrs_out.append(psnr_out)
@@ -188,7 +188,7 @@ def deblur_video_dataset(model, dataloader, kernel="randomLevin", x8=False, nois
 	avg_runtime = torch.Tensor(runtimes).mean()
 
 	if verbose >= 1:
-		print(f'DPIR model: {model.__class__.__name__:<18} PSNR/SSIM noisy: {avg_psnr_noisy:<2.2f}/{avg_ssim_noisy:.4f}, PSNR/SSIM out: {avg_psnr_out:<2.2f}/{avg_ssim_out:.4f} \t runtime: {avg_runtime:.3f}s/frame\n')
+		print(f'DPIR model: {model.__class__.__name__:<18} PSNR/SSIM observation: {avg_psnr_noisy:<2.2f}/{avg_ssim_noisy:.4f}, PSNR/SSIM out: {avg_psnr_out:<2.2f}/{avg_ssim_out:.4f} \t runtime: {avg_runtime:.3f}s/frame\n')
 
 	if kernel == "randomLevin":
 		ker = []

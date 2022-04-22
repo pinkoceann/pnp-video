@@ -79,7 +79,7 @@ def interpolate_video_dataset(model, dataloader, missing_pixels=.9, noise_level=
 				ssim_out = ssim_video_batch(video, restored_video, data_range=1.)
 				runtime = t_forward / (B * N)
 				if verbose >= 2:
-					print(f"video: {batch['video_name'][0]:<18} PSNR/SSIM noisy: {psnr_noisy:<2.2f}/{ssim_noisy:.4f}, PSNR/SSIM out: {psnr_out:<2.2f}/{ssim_out:.4f} \t runtime: {runtime:.3f}s/frame")
+					print(f"video: {batch['video_name'][0]:<18} PSNR/SSIM observation: {psnr_noisy:<2.2f}/{ssim_noisy:.4f}, PSNR/SSIM out: {psnr_out:<2.2f}/{ssim_out:.4f} \t runtime: {runtime:.3f}s/frame")
 				vid_names.append(str(batch['video_name'][0]))
 				psnrs_noisy.append(psnr_noisy)
 				psnrs_out.append(psnr_out)
@@ -122,7 +122,7 @@ def interpolate_video_dataset(model, dataloader, missing_pixels=.9, noise_level=
 	avg_runtime = torch.Tensor(runtimes).mean()
 
 	if verbose >= 1:
-		print(f'model: {model.__class__.__name__:<18} PSNR/SSIM noisy: {avg_psnr_noisy:<2.2f}/{avg_ssim_noisy:.4f}, PSNR/SSIM out: {avg_psnr_out:<2.2f}/{avg_ssim_out:.4f} \t runtime: {avg_runtime:.3f}s/frame\n')
+		print(f'model: {model.__class__.__name__:<18} PSNR/SSIM observation: {avg_psnr_noisy:<2.2f}/{avg_ssim_noisy:.4f}, PSNR/SSIM out: {avg_psnr_out:<2.2f}/{avg_ssim_out:.4f} \t runtime: {avg_runtime:.3f}s/frame\n')
 
 	return vid_names, psnrs_noisy, ssims_noisy, psnrs_out, ssims_out, runtimes, psnrs_x_iters, psnrs_z_iters, x_grads_iters, z_grads_iters, x_minus_zs_iters, drs_iters, avg_psnr_noisy, avg_ssim_noisy, avg_psnr_out, avg_ssim_out, avg_runtime
 
@@ -161,7 +161,7 @@ def main(**args):
 	out_folder = args['logdir']
 	if not os.path.exists(out_folder):
 		os.makedirs(out_folder)
-	out_filename = os.path.join(out_folder, f"inpainting_{args['dataset_name']}_")
+	out_filename = os.path.join(out_folder, f"interpolation_{args['dataset_name']}_")
 	for denoiser in args['denoisers']:
 		out_filename += denoiser + '_'
 	out_filename += "s_"

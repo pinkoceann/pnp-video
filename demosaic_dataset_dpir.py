@@ -107,7 +107,7 @@ def demosaic_video_dataset(model, dataloader, x8=False, init_type="matlab", nois
 				ssim_out = ssim_video_batch(video, restored_video, data_range=1.)
 				runtime = t_forward / (B * N)
 				if verbose >= 2:
-					print(f"video: {batch['video_name'][0]:<18} PSNR/SSIM noisy: {psnr_noisy:<2.2f}/{ssim_noisy:.4f}, PSNR/SSIM out: {psnr_out:<2.2f}/{ssim_out:.4f} \t runtime: {runtime:.3f}s/frame")
+					print(f"video: {batch['video_name'][0]:<18} PSNR/SSIM mosaic: {psnr_noisy:<2.2f}/{ssim_noisy:.4f}, PSNR/SSIM out: {psnr_out:<2.2f}/{ssim_out:.4f} \t runtime: {runtime:.3f}s/frame")
 				vid_names.append(str(batch['video_name'][0]))
 				psnrs_noisy.append(psnr_noisy)
 				psnrs_out.append(psnr_out)
@@ -131,7 +131,7 @@ def demosaic_video_dataset(model, dataloader, x8=False, init_type="matlab", nois
 	avg_runtime = torch.Tensor(runtimes).mean()
 
 	if verbose >= 1:
-		print(f'DPIR model: {model.__class__.__name__:<18} PSNR/SSIM noisy: {avg_psnr_noisy:<2.2f}/{avg_ssim_noisy:.4f}, PSNR/SSIM out: {avg_psnr_out:<2.2f}/{avg_ssim_out:.4f} \t runtime: {avg_runtime:.3f}s/frame\n')
+		print(f'DPIR model: {model.__class__.__name__:<18} PSNR/SSIM mosaic: {avg_psnr_noisy:<2.2f}/{avg_ssim_noisy:.4f}, PSNR/SSIM out: {avg_psnr_out:<2.2f}/{avg_ssim_out:.4f} \t runtime: {avg_runtime:.3f}s/frame\n')
 
 	return vid_names, psnrs_noisy, ssims_noisy, psnrs_out, ssims_out, runtimes, avg_psnr_noisy, avg_ssim_noisy, avg_psnr_out, avg_ssim_out, avg_runtime
 
@@ -238,7 +238,7 @@ if __name__ == "__main__":
 	parser.add_argument("--max_frames", type=int, default=-1, help="maximum number of frames per video to load (-1 => load all frames)")
 	# pnp-admm parameters
 	parser.add_argument("--max_iters", type=int, default=40, help="maximum number of pnp-hqs iterations")
-	parser.add_argument("--sigmas", type=float, nargs='+', default=[5], help="noise level of the extra AWGN applied during image degradation (between 0 and 255)")
+	parser.add_argument("--sigmas", type=float, nargs='+', default=[0.], help="noise level of the extra AWGN applied during image degradation (between 0 and 255)")
 	parser.add_argument("--init", type=str, default='matlab', help="init type ('matlab' / 'cv2' / 'mosaic')")
 	argspar = parser.parse_args()
 

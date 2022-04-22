@@ -43,7 +43,7 @@ def denoise_video_dataset(model, dataloader, noise_level=40./255, save_frames=Fa
 				ssim_out = ssim_video_batch(video, denoised_video, data_range=1.)
 				runtime = t_forward / (B * N)
 				if verbose >= 2:
-					print(f"video: {batch['video_name'][0]:<18} PSNR/SSIM noisy: {psnr_noisy:<2.2f}/{ssim_noisy:.4f}, PSNR/SSIM out: {psnr_out:<2.2f}/{ssim_out:.4f} \t runtime: {runtime:.3f}s/frame")
+					print(f"video: {batch['video_name'][0]:<18} PSNR/SSIM observation: {psnr_noisy:<2.2f}/{ssim_noisy:.4f}, PSNR/SSIM out: {psnr_out:<2.2f}/{ssim_out:.4f} \t runtime: {runtime:.3f}s/frame")
 				vid_names.append(str(batch['video_name'][0]))
 				psnrs_noisy.append(psnr_noisy)
 				psnrs_out.append(psnr_out)
@@ -66,9 +66,10 @@ def denoise_video_dataset(model, dataloader, noise_level=40./255, save_frames=Fa
 	avg_runtime = torch.Tensor(runtimes).mean()
 
 	if verbose >= 1:
-		print(f'model: {model.__class__.__name__:<18} PSNR/SSIM noisy: {avg_psnr_noisy:<2.2f}/{avg_ssim_noisy:.4f}, PSNR/SSIM out: {avg_psnr_out:<2.2f}/{avg_ssim_out:.4f} \t runtime: {avg_runtime:.3f}s/frame\n')
+		print(f'model: {model.__class__.__name__:<18} PSNR/SSIM observation: {avg_psnr_noisy:<2.2f}/{avg_ssim_noisy:.4f}, PSNR/SSIM out: {avg_psnr_out:<2.2f}/{avg_ssim_out:.4f} \t runtime: {avg_runtime:.3f}s/frame\n')
 
 	return vid_names, psnrs_noisy, ssims_noisy, psnrs_out, ssims_out, runtimes, avg_psnr_noisy, avg_ssim_noisy, avg_psnr_out, avg_ssim_out, avg_runtime
+
 
 def main(**args):
 	t_init = time.time()
@@ -95,6 +96,7 @@ def main(**args):
 		elif 'fastdvdnet' == denoiser:
 			path_list.append("pretrained_models/fastdvdnet_nodp.pth")
 			model_list.append(FastDVDnet(num_input_frames=5))
+
 	tf = transforms.CenterCrop(args['centercrop']) if args['centercrop'] > 0 else None
 	dataset = videoDataset(args['dataset_path'], extension=args['extension'], nested_subfolders=args['dataset_depth'], transform=tf, max_video_length=args['max_frames'])
 	print(f'created a dataset of {len(dataset)} videos.')

@@ -90,7 +90,7 @@ def demosaic_video_dataset_annealing(model, dataloader, init_type="mosaic", nois
 				ssim_out = ssim_video_batch(video, restored_video, data_range=1.)
 				runtime = t_forward / (B * N)
 				if verbose >= 2:
-					print(f"video: {batch['video_name'][0]:<18} PSNR/SSIM noisy: {psnr_noisy:<2.2f}/{ssim_noisy:.4f}, PSNR/SSIM out: {psnr_out:<2.2f}/{ssim_out:.4f} \t runtime: {runtime:.3f}s/frame")
+					print(f"video: {batch['video_name'][0]:<18} PSNR/SSIM mosaic: {psnr_noisy:<2.2f}/{ssim_noisy:.4f}, PSNR/SSIM out: {psnr_out:<2.2f}/{ssim_out:.4f} \t runtime: {runtime:.3f}s/frame")
 				vid_names.append(str(batch['video_name'][0]))
 				psnrs_noisy.append(psnr_noisy)
 				psnrs_out.append(psnr_out)
@@ -134,7 +134,7 @@ def demosaic_video_dataset_annealing(model, dataloader, init_type="mosaic", nois
 	avg_runtime = torch.Tensor(runtimes).mean()
 
 	if verbose >= 1:
-		print(f'model: {model.__class__.__name__:<18} PSNR/SSIM noisy: {avg_psnr_noisy:<2.2f}/{avg_ssim_noisy:.4f}, PSNR/SSIM out: {avg_psnr_out:<2.2f}/{avg_ssim_out:.4f} \t runtime: {avg_runtime:.3f}s/frame\n')
+		print(f'model: {model.__class__.__name__:<18} PSNR/SSIM mosaic: {avg_psnr_noisy:<2.2f}/{avg_ssim_noisy:.4f}, PSNR/SSIM out: {avg_psnr_out:<2.2f}/{avg_ssim_out:.4f} \t runtime: {avg_runtime:.3f}s/frame\n')
 
 	return vid_names, psnrs_noisy, ssims_noisy, psnrs_out, ssims_out, runtimes, psnrs_x_iters, psnrs_z_iters, x_grads_iters, z_grads_iters, x_minus_zs_iters, drs_iters, avg_psnr_noisy, avg_ssim_noisy, avg_psnr_out, avg_ssim_out, avg_runtime
 
@@ -211,8 +211,6 @@ def main(**args):
 					res_dict[model.__class__.__name__][f"s={s}"][f"sigma={sigma}"][f"alpha={alpha}"] = {'avg_psnr_noisy': float(avg_psnr_noisy), 'avg_ssim_noisy': float(avg_ssim_noisy), 'avg_psnr_out': float(avg_psnr_out), 'avg_ssim_out': float(avg_ssim_out), 'avg_runtime': float(avg_runtime)}
 					for v, vid_name in enumerate(vid_names):
 						res_dict[model.__class__.__name__][f"s={s}"][f"sigma={sigma}"][f"alpha={alpha}"][vid_name] = {'psnr_noisy': float(psnrs_noisy[v]), 'ssim_noisy': float(ssims_noisy[v]), 'psnr_out': float(psnrs_out[v]), 'ssim_out' : float(ssims_out[v]), 'runtime' : runtimes[v], 'psnr_x_iters': psnrs_x_iters[v].tolist(), 'psnr_z_iters': psnrs_z_iters[v].tolist(), 'x_grad_iters': x_grads_iters[v].tolist(), 'z_grad_iters': z_grads_iters[v].tolist(), 'x_minus_z_iters': x_minus_zs_iters[v].tolist(), 'dr_iters': drs_iters[v].tolist()}
-					# res_dict[model.__class__.__name__][prob] = {'PSNR/SSIM noisy': [psnr_noisy, ssim_noisy], 'PSNR/SSIM out': [psnr_out, ssim_out]}
-					# average_runtime += torch.Tensor(runtimes).mean()
 					torch.cuda.empty_cache()
 					# save res dict frequently just in case
 					with open(out_filename, 'w') as handle:
@@ -242,7 +240,7 @@ if __name__ == "__main__":
 	parser.add_argument("--save_graphs", action='store_true', help="save graphs as images")
 	# Model parameters
 	parser.add_argument("--denoisers", type=str, nargs='+', default=['fastdvdnet'], help="selected model ('fastdvdnet' / 'drunet')")
-	parser.add_argument("--max_denoiser_levels", type=float, nargs='+', default=[50.], help="max noise level applied to the CNN denoiser (between 0 and 255)")
+	parser.add_argument("--max_denoiser_levels", type=float, nargs='+', default=[30.], help="max noise level applied to the CNN denoiser (between 0 and 255)")
 	parser.add_argument("--min_denoiser_level", type=float, default=5., help="min noise level applied to the CNN denoiser (between 0 and 255)")
 	# data parameters
 	parser.add_argument("--dataset_path", type=str, default='./data/subset_4', help="path to the folder of the video dataset")
@@ -252,9 +250,9 @@ if __name__ == "__main__":
 	parser.add_argument("--centercrop", type=int, default=-1, help="center crop size if any (-1 => full res)")
 	parser.add_argument("--max_frames", type=int, default=-1, help="maximum number of frames per video to load (-1 => load all frames)")
 	# pnp-admm parameters
-	parser.add_argument("--max_iters", type=int, default=100, help="maximum number of pnp-admm iterations")
-	parser.add_argument("--sigmas", type=float, nargs='+', default=[5], help="noise level of the extra AWGN applied during image degradation (between 0 and 255)")
-	parser.add_argument("--alphas", type=float, nargs='+', default=[1.], help="admm alpha parameter")
+	parser.add_argument("--max_iters", type=int, default=200, help="maximum number of pnp-admm iterations")
+	parser.add_argument("--sigmas", type=float, nargs='+', default=[0.], help="noise level of the extra AWGN applied during image degradation (between 0 and 255)")
+	parser.add_argument("--alphas", type=float, nargs='+', default=[0.25], help="admm alpha parameter")
 	parser.add_argument("--init", type=str, default='mosaic', help="init type ('mosaic' / 'matlab' / 'cv2')")
 	argspar = parser.parse_args()
 

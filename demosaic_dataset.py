@@ -26,7 +26,7 @@ from zhang_utils.utils_mosaic import dm_matlab
 
 def mosaic_mask_video(video, noise_level=5/255., pattern="RGGB"):
 	'''WARNING: if the input RGB video has channel stacked in the [R, G, B] order,
-	this creates a [[G, R], [G, B]] pattern simply by masking the appropriate locations.'''
+	this creates a [[R, G], [G, B]] pattern simply by masking the appropriate locations.'''
 	B, N, C, H, W = video.shape
 	# generate the mask
 	mask = torch.zeros((B, N, C, H, W), device=video.device)
@@ -38,7 +38,7 @@ def mosaic_mask_video(video, noise_level=5/255., pattern="RGGB"):
 		mask[:, :, 1, 1::2, 0::2] = 1
 		# Blue
 		mask[:, :, 2, 1::2, 1::2] = 1
-	elif pattern == "GRGB":
+	elif pattern == "GRBG":
 		# Red
 		mask[:, :, 0, 0::2, 1::2] = 1
 		# Green
@@ -123,7 +123,7 @@ def demosaic_video_dataset(model, dataloader, init_type="mosaic", noise_level=0.
 				ssim_out = ssim_video_batch(video, restored_video, data_range=1.)
 				runtime = t_forward / (B * N)
 				if verbose >= 2:
-					print(f"video: {batch['video_name'][0]:<18} PSNR/SSIM noisy: {psnr_noisy:<2.2f}/{ssim_noisy:.4f}, PSNR/SSIM out: {psnr_out:<2.2f}/{ssim_out:.4f} \t runtime: {runtime:.3f}s/frame")
+					print(f"video: {batch['video_name'][0]:<18} PSNR/SSIM mosaic: {psnr_noisy:<2.2f}/{ssim_noisy:.4f}, PSNR/SSIM out: {psnr_out:<2.2f}/{ssim_out:.4f} \t runtime: {runtime:.3f}s/frame")
 				vid_names.append(str(batch['video_name'][0]))
 				psnrs_noisy.append(psnr_noisy)
 				psnrs_out.append(psnr_out)
@@ -167,7 +167,7 @@ def demosaic_video_dataset(model, dataloader, init_type="mosaic", noise_level=0.
 	avg_runtime = torch.Tensor(runtimes).mean()
 
 	if verbose >= 1:
-		print(f'model: {model.__class__.__name__:<18} PSNR/SSIM noisy: {avg_psnr_noisy:<2.2f}/{avg_ssim_noisy:.4f}, PSNR/SSIM out: {avg_psnr_out:<2.2f}/{avg_ssim_out:.4f} \t runtime: {avg_runtime:.3f}s/frame\n')
+		print(f'model: {model.__class__.__name__:<18} PSNR/SSIM mosaic: {avg_psnr_noisy:<2.2f}/{avg_ssim_noisy:.4f}, PSNR/SSIM out: {avg_psnr_out:<2.2f}/{avg_ssim_out:.4f} \t runtime: {avg_runtime:.3f}s/frame\n')
 
 	return vid_names, psnrs_noisy, ssims_noisy, psnrs_out, ssims_out, runtimes, psnrs_x_iters, psnrs_z_iters, x_grads_iters, z_grads_iters, x_minus_zs_iters, drs_iters, avg_psnr_noisy, avg_ssim_noisy, avg_psnr_out, avg_ssim_out, avg_runtime
 
