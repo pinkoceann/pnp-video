@@ -2,8 +2,7 @@
 
 Code adapted by amonod
 Definition of the FastDVDnet model
-
-Copyright (C) 2019, Matias Tassano <matias.tassano@parisdescartes.fr>
+Derived from original FastDVDnet code
 
 This program is free software: you can use, modify and/or
 redistribute it under the terms of the GNU General Public
