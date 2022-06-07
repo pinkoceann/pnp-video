@@ -16,3 +16,11 @@ Download DRUNet pretrained weights (too large to be stored in this repo) at [htt
 ### Additional data
 
 Full DAVIS 2017 test set downloadable at [https://data.vision.ee.ethz.ch/csergi/share/davis/DAVIS-2017-test-challenge-480p.zip](https://data.vision.ee.ethz.ch/csergi/share/davis/DAVIS-2017-test-challenge-480p.zip)
+
+## Video Results
+
+**Comparison videos** of the experiments described in the article are downloadable at [https://drive.google.com/drive/folders/1f-YOjAopNj2QPkOiXsRpY8QKcUqAuZft?usp=sharing](https://drive.google.com/drive/folders/1f-YOjAopNj2QPkOiXsRpY8QKcUqAuZft?usp=sharing) (to be replaced by a non anonymized storage solution and/or a Youtube link for the camera ready version)
+  - deblurring
+  - super-resolution
+  - demosaicking
+  - interpolation of random missing pixels
