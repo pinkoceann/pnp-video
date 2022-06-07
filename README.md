@@ -24,3 +24,5 @@ Full DAVIS 2017 test set downloadable at [https://data.vision.ee.ethz.ch/csergi/
   - super-resolution
   - demosaicking
   - interpolation of random missing pixels
+ 
+ Download the .mp4 files and look at the videos locally for minimal compression. Feel free to view the sequences at a lower framerate if needed.
