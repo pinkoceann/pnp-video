@@ -1,4 +1,4 @@
-# pnp_video
+# pnp-video
 
 Code associated to the contribution **Video Restoration with a Deep Plug-and-Play Prior**
 
