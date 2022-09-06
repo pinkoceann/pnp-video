@@ -19,7 +19,7 @@ Full DAVIS 2017 test set downloadable at [https://data.vision.ee.ethz.ch/csergi/
 
 ## Video Results
 
-**Comparison videos** of the experiments described in the article are downloadable at [https://drive.google.com/drive/folders/1f-YOjAopNj2QPkOiXsRpY8QKcUqAuZft?usp=sharing](https://drive.google.com/drive/folders/1f-YOjAopNj2QPkOiXsRpY8QKcUqAuZft?usp=sharing) (to be replaced by a non anonymized storage solution and/or a Youtube link for the camera ready version)
+**Comparison videos** of the experiments described in the article are downloadable at [https://drive.google.com/drive/folders/1f-YOjAopNj2QPkOiXsRpY8QKcUqAuZft?usp=sharing](https://drive.google.com/drive/folders/1f-YOjAopNj2QPkOiXsRpY8QKcUqAuZft?usp=sharing) (to be replaced by a different solution and/or a Youtube link)
   - deblurring
   - super-resolution
   - demosaicking
